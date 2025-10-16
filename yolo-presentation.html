@@ -1,0 +1,2534 @@
+<!DOCTYPE html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>YOLO: Tek Aşamada Nesne Tespiti Sunumu</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css"
+      rel="stylesheet"
+    />
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Poppins", sans-serif;
+        background: linear-gradient(
+          135deg,
+          #1e3c72 0%,
+          #2a5298 50%,
+          #ff7f50 100%
+        );
+        overflow: hidden;
+        user-select: none;
+      }
+
+      .presentation-container {
+        width: 100vw;
+        height: 100vh;
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .slide {
+        width: 90vw;
+        height: 90vh;
+        max-width: 1600px;
+        max-height: 900px;
+        aspect-ratio: 16/9;
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 20px;
+        padding: 60px;
+        display: none;
+        flex-direction: column;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        backdrop-filter: blur(10px);
+        overflow-y: auto;
+      }
+
+      .slide.active {
+        display: flex;
+      }
+
+      .slide h1 {
+        font-size: 3.5rem;
+        font-weight: 700;
+        color: #1e3c72;
+        margin-bottom: 30px;
+        text-align: center;
+        background: linear-gradient(45deg, #1e3c72, #ff7f50);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+
+      .slide h2 {
+        font-size: 2.5rem;
+        font-weight: 600;
+        color: #2a5298;
+        margin-bottom: 25px;
+      }
+
+      .slide h3 {
+        font-size: 1.8rem;
+        font-weight: 500;
+        color: #ff7f50;
+        margin-bottom: 20px;
+      }
+
+      .slide p,
+      .slide li {
+        font-size: 1.2rem;
+        line-height: 1.6;
+        color: #333;
+        margin-bottom: 15px;
+      }
+
+      .slide ul {
+        margin-left: 30px;
+        margin-bottom: 20px;
+      }
+
+      .image-placeholder {
+        width: 100%;
+        height: 300px;
+        background: linear-gradient(45deg, #e3f2fd, #ffecb3);
+        border: 3px dashed #ff7f50;
+        border-radius: 15px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 20px 0;
+        font-size: 1.1rem;
+        color: #666;
+        font-weight: 500;
+        text-align: center;
+        padding: 10px;
+      }
+
+      .image-placeholder.small {
+        height: 150px;
+        width: 100%;
+        margin-bottom: 10px;
+      }
+
+      .comparison-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+        margin: 20px 0;
+      }
+
+      .comparison-card {
+        background: linear-gradient(135deg, #f5f7fa, #c3cfe2);
+        padding: 20px;
+        border-radius: 15px;
+        border-left: 5px solid #ff7f50;
+      }
+
+      .comparison-card h4 {
+        color: #1e3c72;
+        font-size: 1.3rem;
+        margin-bottom: 10px;
+      }
+
+      .architecture-diagram {
+        width: 100%;
+        height: 250px;
+        background: linear-gradient(90deg, #e8f5e8, #fff3e0, #fce4ec);
+        border-radius: 15px;
+        display: flex;
+        align-items: center;
+        justify-content: space-around;
+        margin: 20px 0;
+        position: relative;
+      }
+
+      .layer-box {
+        width: 120px;
+        height: 80px;
+        background: linear-gradient(135deg, #2196f3, #21cbf3);
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 600;
+        position: relative;
+        box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3);
+      }
+
+      .layer-box::after {
+        content: "→";
+        position: absolute;
+        right: -25px;
+        font-size: 1.5rem;
+        color: #ff7f50;
+      }
+
+      .layer-box:last-child::after {
+        display: none;
+      }
+
+      .grid-system {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        grid-template-rows: repeat(7, 1fr);
+        gap: 2px;
+        width: 300px;
+        height: 300px;
+        margin: 20px auto;
+        border: 2px solid #1e3c72;
+        border-radius: 10px;
+        padding: 10px;
+      }
+
+      .grid-cell {
+        background: rgba(255, 127, 80, 0.1);
+        border: 1px solid rgba(255, 127, 80, 0.3);
+        border-radius: 3px;
+      }
+
+      .grid-cell.detected {
+        background: rgba(255, 127, 80, 0.8);
+        animation: pulse 2s infinite;
+      }
+
+      @keyframes pulse {
+        0% {
+          opacity: 0.8;
+        }
+        50% {
+          opacity: 0.4;
+        }
+        100% {
+          opacity: 0.8;
+        }
+      }
+
+      .pros-cons {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 30px;
+        margin: 20px 0;
+      }
+
+      .pros,
+      .cons {
+        padding: 20px;
+        border-radius: 15px;
+      }
+
+      .pros {
+        background: linear-gradient(135deg, #e8f5e8, #d4edda);
+        border-left: 5px solid #28a745;
+      }
+
+      .cons {
+        background: linear-gradient(135deg, #fff3e0, #f8d7da);
+        border-left: 5px solid #dc3545;
+      }
+
+      .code-block {
+        background: #2d3748;
+        color: #e2e8f0;
+        padding: 20px;
+        border-radius: 10px;
+        font-family: "Monaco", "Courier New", monospace;
+        font-size: 0.9rem;
+        margin: 15px 0;
+        overflow-x: auto;
+      }
+
+      .slide-content {
+        display: flex;
+        gap: 20px;
+        width: 100%;
+      }
+
+      .slide-content.reverse {
+        flex-direction: row-reverse;
+      }
+
+      .slide-content .text-content {
+        flex: 1;
+      }
+
+      .slide-content .image-content {
+        flex: 1;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+
+      .slide-image {
+        max-width: 100%;
+        max-height: 450px;
+        height: auto;
+        border-radius: 15px;
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+        object-fit: contain;
+        transition: transform 0.3s ease;
+      }
+
+      .slide-image.expandable:hover,
+      .grid-image.expandable:hover {
+        transform: scale(1.05);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+      }
+
+      .toc-slide .slide-image {
+        max-height: none;
+      }
+
+      .slide.toc-slide {
+        padding-top: 40px;
+        padding-bottom: 40px;
+      }
+
+      .image-grid-2x2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 15px;
+        margin: 20px 0;
+        padding: 0 80px;
+      }
+
+      .grid-image {
+        width: 100%;
+        border-radius: 10px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        object-fit: cover;
+        height: auto;
+      }
+
+      .slide-image.expandable,
+      .grid-image.expandable {
+        cursor: pointer;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+      }
+
+      /* Definitive style for the 2x2 application grid slides */
+      .four-image-slide.active {
+        display: grid; /* Use Grid for the whole slide */
+        grid-template-rows: auto 1fr; /* Title gets auto height, grid gets the rest */
+        overflow: hidden; /* Absolutely prevent any scrolling */
+        padding-top: 40px;
+        padding-bottom: 40px;
+      }
+      .four-image-slide > h1 {
+        margin-bottom: 20px;
+      }
+      .four-image-slide .image-grid-2x2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: 1fr 1fr;
+        gap: 15px;
+        padding: 0 40px;
+        margin: 0;
+        min-height: 0; /* Fix for nested grid/flex sizing */
+      }
+      .four-image-slide .grid-image {
+        width: 100%;
+        height: 100%;
+        object-fit: contain; /* Fit image without distortion */
+      }
+
+      /* Image Modal Styles */
+      .image-modal {
+        display: none;
+        position: fixed;
+        z-index: 2000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        overflow: auto;
+        background-color: rgba(0, 0, 0, 0.9);
+        justify-content: center;
+        align-items: center;
+      }
+
+      .image-modal.show {
+        display: flex;
+      }
+
+      .modal-content {
+        margin: auto;
+        display: block;
+        max-width: 90vw;
+        max-height: 90vh;
+        object-fit: contain;
+        animation-name: zoom;
+        animation-duration: 0.4s;
+      }
+
+      @keyframes zoom {
+        from {
+          transform: scale(0.1);
+        }
+        to {
+          transform: scale(1);
+        }
+      }
+
+      .close-modal {
+        position: absolute;
+        top: 25px;
+        right: 45px;
+        color: #f1f1f1;
+        font-size: 40px;
+        font-weight: bold;
+        transition: 0.3s;
+        cursor: pointer;
+      }
+
+      .close-modal:hover,
+      .close-modal:focus {
+        color: #bbb;
+        text-decoration: none;
+      }
+
+      /* Navigation */
+      .nav-controls {
+        position: fixed;
+        bottom: 30px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        background: rgba(30, 60, 114, 0.9);
+        padding: 15px 25px;
+        border-radius: 50px;
+        backdrop-filter: blur(10px);
+      }
+
+      .nav-btn {
+        background: rgba(255, 127, 80, 0.8);
+        border: none;
+        color: white;
+        width: 45px;
+        height: 45px;
+        border-radius: 50%;
+        cursor: pointer;
+        font-size: 1.2rem;
+        transition: all 0.3s ease;
+      }
+
+      .nav-btn:hover {
+        background: #ff7f50;
+        transform: scale(1.1);
+      }
+
+      .nav-btn:disabled {
+        background: rgba(255, 255, 255, 0.3);
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      .slide-counter {
+        color: white;
+        font-weight: 500;
+        font-size: 1rem;
+      }
+
+      .progress-bar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 4px;
+        background: linear-gradient(90deg, #1e3c72, #ff7f50);
+        transition: width 0.3s ease;
+        z-index: 1000;
+      }
+
+      /* Cover Slide Special Styling */
+      .slide.cover {
+        background: linear-gradient(
+            135deg,
+            rgba(30, 60, 114, 0.8) 0%,
+            rgba(42, 82, 152, 0.75) 50%,
+            rgba(255, 127, 80, 0.65) 100%
+          ),
+          url("images/kapak.jpg");
+        background-size: cover;
+        background-position: center center;
+        color: white;
+        text-align: center;
+        justify-content: center;
+      }
+
+      .slide.cover h1 {
+        font-size: 5rem;
+        margin-bottom: 20px;
+        background: linear-gradient(45deg, #ffffff, #ff7f50);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        text-shadow: 0 3px 15px rgba(0, 0, 0, 0.4);
+      }
+
+      .slide.cover .subtitle {
+        font-size: 2rem;
+        font-weight: 500;
+        opacity: 1;
+        margin-bottom: 40px;
+        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+      }
+
+      .focus-areas {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+        margin-top: 40px;
+      }
+
+      .focus-item {
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        border-radius: 15px;
+        padding: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+      }
+
+      .focus-item h3 {
+        color: #ff7f50;
+        margin-bottom: 10px;
+      }
+
+      /* Table of Contents Styling - Enhanced */
+      .toc-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin: 20px 0;
+      }
+
+      .toc-item {
+        background: linear-gradient(
+          135deg,
+          rgba(255, 255, 255, 0.95),
+          rgba(245, 247, 250, 0.9)
+        );
+        padding: 20px 25px;
+        border-radius: 16px;
+        border: 1px solid rgba(255, 127, 80, 0.2);
+        cursor: pointer;
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
+      }
+
+      .toc-item::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 5px;
+        height: 100%;
+        background: linear-gradient(180deg, #ff7f50, #ff6347);
+        transition: width 0.4s ease;
+      }
+
+      .toc-item:hover {
+        background: linear-gradient(
+          135deg,
+          rgba(255, 255, 255, 1),
+          rgba(248, 249, 250, 0.95)
+        );
+        transform: translateX(15px) translateY(-3px);
+        box-shadow: 0 15px 30px rgba(30, 60, 114, 0.15);
+        border-color: rgba(30, 60, 114, 0.3);
+      }
+
+      .toc-item:hover::before {
+        width: 6px;
+        background: linear-gradient(180deg, #1e3c72, #2a5298);
+      }
+
+      .toc-item h3 {
+        color: #1e3c72;
+        margin-bottom: 8px;
+        font-size: 1.6rem;
+        font-weight: 600;
+        transition: color 0.3s ease;
+      }
+
+      .toc-item:hover h3 {
+        color: #ff7f50;
+      }
+
+      .toc-item p {
+        font-size: 1rem;
+        color: #666;
+        margin-bottom: 0;
+        line-height: 1.5;
+        transition: color 0.3s ease;
+      }
+
+      .toc-item:hover p {
+        color: #444;
+      }
+
+      /* Academic Information Styles */
+      .academic-info {
+        margin-top: 40px;
+        text-align: center;
+      }
+
+      .academic-info .university {
+        font-size: 1.8rem;
+        font-weight: 600;
+        color: #ffffff;
+        opacity: 0.95;
+        margin-bottom: 10px;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+      }
+
+      .academic-info .course {
+        font-size: 1.4rem;
+        font-weight: 500;
+        color: #ffffff;
+        opacity: 0.9;
+        margin-bottom: 30px;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+      }
+
+      .academic-info .instructor,
+      .academic-info .authors {
+        font-size: 1.2rem;
+        font-weight: 400;
+        color: #ffffff;
+        opacity: 0.85;
+        margin-bottom: 8px;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+      }
+
+      /* Academic info for conclusion slide */
+      .conclusion-academic {
+        background: rgba(30, 60, 114, 0.1);
+        border: 2px solid rgba(30, 60, 114, 0.3);
+        border-radius: 15px;
+        padding: 25px;
+        margin-top: 30px;
+        text-align: center;
+      }
+
+      .conclusion-academic .university {
+        font-size: 1.6rem;
+        font-weight: 600;
+        color: #1e3c72;
+        margin-bottom: 8px;
+      }
+
+      .conclusion-academic .course {
+        font-size: 1.3rem;
+        font-weight: 500;
+        color: #2a5298;
+        margin-bottom: 15px;
+      }
+
+      .conclusion-academic .instructor,
+      .conclusion-academic .authors {
+        font-size: 1.1rem;
+        font-weight: 400;
+        color: #333;
+        margin-bottom: 5px;
+      }
+
+      /* Interactive & Animation Enhancements */
+      .comparison-card,
+      .toc-item {
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+      }
+
+      .comparison-card:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2);
+      }
+
+      .layer-box {
+        transition: transform 0.3s ease, background 0.3s ease;
+      }
+
+      .layer-box:hover {
+        transform: scale(1.1);
+        background: linear-gradient(135deg, #ff7f50, #ff6347);
+      }
+
+      .focus-item {
+        transition: background 0.3s ease;
+      }
+
+      .focus-item:hover {
+        background: rgba(255, 255, 255, 0.2);
+      }
+
+      /* Responsive Design */
+      @media (max-width: 768px) {
+        .slide {
+          padding: 30px;
+          width: 95vw;
+          height: 95vh;
+        }
+
+        .slide h1 {
+          font-size: 2.5rem;
+        }
+
+        .slide h2 {
+          font-size: 1.8rem;
+        }
+
+        .architecture-diagram {
+          flex-direction: column;
+          height: auto;
+          gap: 10px;
+        }
+
+        .layer-box::after {
+          content: "↓";
+          top: -25px;
+          right: 50%;
+          transform: translateX(50%);
+        }
+
+        .pros-cons {
+          grid-template-columns: 1fr;
+        }
+
+        .slide-content {
+          flex-direction: column;
+        }
+        .slide-image {
+          max-height: 300px;
+        }
+
+        /* Responsive academic info */
+        .academic-info .university {
+          font-size: 1.4rem;
+        }
+
+        .academic-info .course {
+          font-size: 1.1rem;
+        }
+
+        .academic-info .instructor,
+        .academic-info .authors {
+          font-size: 1rem;
+        }
+
+        .conclusion-academic .university {
+          font-size: 1.3rem;
+        }
+
+        .conclusion-academic .course {
+          font-size: 1.1rem;
+        }
+
+        .conclusion-academic .instructor,
+        .conclusion-academic .authors {
+          font-size: 0.95rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="presentation-container">
+      <div class="progress-bar" id="progressBar"></div>
+
+      <!-- Slide 1: Cover -->
+      <div class="slide active cover">
+        <h1>YOLO</h1>
+        <p class="subtitle">
+          Tek Aşamada Nesne Tespiti: Mimari, Eğitim ve Uygulamalar
+        </p>
+
+        <div class="academic-info" style="margin-top: 10px; margin-bottom: 0px">
+          <p class="university">Burdur Mehmet Akif Ersoy Üniversitesi</p>
+          <p class="course" style="margin-bottom: 0">
+            Yüksek Lisans Yapay Zeka Dersi Projesi
+          </p>
+        </div>
+
+        <div class="focus-areas">
+          <div class="focus-item">
+            <h3>Yenilikçi Mimari</h3>
+            <p>Tek geçişli tespit algoritması</p>
+          </div>
+          <div class="focus-item">
+            <h3>Gerçek Zamanlı</h3>
+            <p>Hızlı ve verimli performans</p>
+          </div>
+          <div class="focus-item">
+            <h3>Geniş Uygulama</h3>
+            <p>Çok amaçlı kullanım alanları</p>
+          </div>
+        </div>
+
+        <div class="academic-info" style="margin-top: auto; padding-top: 20px">
+          <p class="instructor">Ders Öğretmeni: Elvan Duman</p>
+          <p class="authors">Hazırlayanlar: Engin DALGA - Onur ŞAKRAKER</p>
+        </div>
+      </div>
+
+      <!-- Slide 2: Table of Contents -->
+      <div class="slide toc-slide">
+        <h1>İçindekiler</h1>
+        <div class="slide-content">
+          <div class="text-content" style="flex: 1.1">
+            <div class="toc-grid">
+              <div class="toc-item" onclick="goToSlide(2)">
+                <h3>1. YOLO'ya Giriş</h3>
+                <p>Temel kavramlar ve nesne tespiti</p>
+              </div>
+              <div class="toc-item" onclick="goToSlide(4)">
+                <h3>2. YOLO Mimarisi & Teknik Detaylar</h3>
+                <p>Ağ yapısı, loss function, multi-scale detection</p>
+              </div>
+              <div class="toc-item" onclick="goToSlide(11)">
+                <h3>3. YOLO Evrimi</h3>
+                <p>2016-2025 arası tüm versiyonlar (v1-v11)</p>
+              </div>
+              <div class="toc-item" onclick="goToSlide(13)">
+                <h3>4. Modern Kullanım & Kod</h3>
+                <p>Ultralytics ile pratik uygulamalar</p>
+              </div>
+              <div class="toc-item" onclick="goToSlide(14)">
+                <h3>5. Güncel Uygulama Alanları</h3>
+                <p>2025 için pratik kullanım senaryoları</p>
+              </div>
+              <div class="toc-item" onclick="goToSlide(16)">
+                <h3>6. Performans & Gelecek</h3>
+                <p>Metrikler, trendler ve araştırma yönelimleri</p>
+              </div>
+              <div class="toc-item" onclick="goToSlide(18)">
+                <h3>7. Sonuç</h3>
+                <p>Özet ve gelecek vizyonu</p>
+              </div>
+            </div>
+          </div>
+          <div class="image-content">
+            <img
+              src="images/slayt2_new.jpg"
+              alt="İçindekiler Slayt Resmi"
+              loading="lazy"
+              class="slide-image expandable"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Slide 3: YOLO'ya Giriş -->
+      <div class="slide">
+        <h1>YOLO'ya Giriş</h1>
+        <div class="slide-content">
+          <div class="text-content">
+            <h2>YOLO Nedir?</h2>
+            <ul>
+              <li>
+                <strong>You Only Look Once:</strong> Tek bakışta nesne tespiti
+              </li>
+              <li>Gerçek zamanlı nesne tespit algoritması</li>
+              <li>2016 yılında Joseph Redmon tarafından geliştirildi</li>
+              <li>
+                Tek sinir ağı geçişi ile hem sınıflandırma hem de lokalizasyon
+              </li>
+            </ul>
+
+            <h3>Nesne Tespiti Nedir?</h3>
+            <p>
+              Görüntü içerisindeki nesnelerin hem sınıfını (ne olduğunu) hem de
+              konumunu (nerede olduğunu) belirleme işlemidir.
+            </p>
+            <ul>
+              <li><strong>Sınıflandırma:</strong> "Bu bir kedi."</li>
+              <li><strong>Lokalizasyon:</strong> "Kedi bu koordinatlarda."</li>
+            </ul>
+          </div>
+          <div class="image-content">
+            <img
+              src="images/slayt3.jpg"
+              alt="YOLO'ya Giriş, nesne tespiti örneği"
+              loading="lazy"
+              class="slide-image expandable"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Slide 4: Geleneksel Yöntemlerle Farklar -->
+      <div class="slide">
+        <h1>Geleneksel Yöntemlerle Farkları</h1>
+        <div class="slide-content reverse">
+          <div class="text-content">
+            <div class="comparison-grid">
+              <div class="comparison-card">
+                <h4>Geleneksel Yöntemler (R-CNN)</h4>
+                <ul>
+                  <li>Çok aşamalı işlem</li>
+                  <li>Yavaş performans (~2000 bölge)</li>
+                  <li>Karmaşık pipeline</li>
+                  <li>Eğitim zorluğu</li>
+                </ul>
+              </div>
+              <div class="comparison-card">
+                <h4>YOLO Yaklaşımı</h4>
+                <ul>
+                  <li>Tek aşamalı işlem</li>
+                  <li>Hızlı performans (45+ FPS)</li>
+                  <li>Basit mimari</li>
+                  <li>End-to-end eğitim</li>
+                </ul>
+              </div>
+            </div>
+
+            <h3>Ana Farklar</h3>
+            <ul>
+              <li><strong>Hız:</strong> YOLO gerçek zamanlı çalışabilir</li>
+              <li><strong>Basitlik:</strong> Tek ağ yapısı</li>
+              <li>
+                <strong>Global Context:</strong> Tüm görüntüyü aynı anda işler
+              </li>
+              <li><strong>Eğitim:</strong> Uçtan uca öğrenme</li>
+            </ul>
+          </div>
+          <div class="image-content">
+            <img
+              src="images/slayt4.jpg"
+              alt="R-CNN vs YOLO Karşılaştırması"
+              loading="lazy"
+              class="slide-image expandable"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Slide 5: YOLO Mimarisi -->
+      <div class="slide">
+        <h1>YOLO Mimarisi</h1>
+        <div class="slide-content">
+          <div class="text-content">
+            <div class="architecture-diagram">
+              <div class="layer-box">Giriş<br />448×448</div>
+              <div class="layer-box">Conv<br />Layers</div>
+              <div class="layer-box">FC<br />Layers</div>
+              <div class="layer-box">Çıktı<br />7×7×30</div>
+            </div>
+
+            <h2>Ağ Yapısı</h2>
+            <ul>
+              <li><strong>24 Konvolüsyonel Katman:</strong> Özellik çıkarma</li>
+              <li>
+                <strong>2 Fully Connected Katman:</strong> Tahmin oluşturma
+              </li>
+              <li>
+                <strong>Leaky ReLU Aktivasyon:</strong> Doğrusal olmayan öğrenme
+              </li>
+              <li><strong>Dropout:</strong> Aşırı öğrenmeyi önleme</li>
+            </ul>
+
+            <h3>Tek Aşamada Tespit Nasıl Çalışır?</h3>
+            <p>
+              YOLO görüntüyü bir kez ağdan geçirir ve aynı anda hem nesne
+              varlığını hem de sınıfını hem de bounding box koordinatlarını
+              tahmin eder. Bu sayede çok hızlı çalışır.
+            </p>
+          </div>
+          <div class="image-content">
+            <img
+              src="images/slayt5.jpg"
+              alt="YOLO Mimarisi Diyagramı"
+              loading="lazy"
+              class="slide-image expandable"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Slide 6: Grid System -->
+      <div class="slide">
+        <h1>Izgara Sistemi (Grid System)</h1>
+
+        <div class="slide-content">
+          <div class="text-content" style="flex: 1.5">
+            <h2>Izgara Sistemi Çalışma Prensibi</h2>
+            <ul>
+              <li><strong>7×7 Grid:</strong> Görüntü 49 hücreye bölünür</li>
+              <li><strong>Her Hücre:</strong> 2 bounding box tahmin eder</li>
+              <li><strong>Güven Skoru:</strong> Nesne varlık olasılığı</li>
+              <li>
+                <strong>Sınıf Olasılıkları:</strong> 20 farklı nesne sınıfı
+              </li>
+            </ul>
+
+            <h3>Çıktı Tensor Yapısı: 7×7×30</h3>
+            <ul>
+              <li>
+                <strong>5×2 = 10:</strong> İki bounding box (x, y, w, h,
+                confidence)
+              </li>
+              <li><strong>20:</strong> Sınıf olasılıkları</li>
+              <li><strong>Toplam:</strong> Her hücre için 30 değer</li>
+            </ul>
+          </div>
+          <div class="image-content" style="flex: 1">
+            <img
+              src="images/slayt6.jpg"
+              alt="YOLO Grid Sistemi"
+              loading="lazy"
+              class="slide-image expandable"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Slide 7: YOLO v3+ Multi-Scale Detection System -->
+      <div class="slide">
+        <h1>YOLO v3+ Multi-Scale Detection Sistemi</h1>
+
+        <div class="slide-content">
+          <div class="text-content" style="flex: 1.5">
+            <h2>Multi-Scale Detection Çalışma Prensibi</h2>
+            <ul>
+              <li>
+                <strong>3 Farklı Ölçek:</strong> Küçük, orta ve büyük nesneler
+                için
+              </li>
+              <li>
+                <strong>Feature Pyramid Network (FPN):</strong> Hiyerarşik
+                özellik birleştirme
+              </li>
+              <li>
+                <strong>Anchor Boxes:</strong> Her ölçekte 3'er önceden tanımlı
+                kutu
+              </li>
+              <li>
+                <strong>Darknet-53 Backbone:</strong> 53 katmanlı daha derin ağ
+              </li>
+            </ul>
+
+            <h3>Çıktı Tensor Yapısı: 3 Farklı Boyut</h3>
+            <ul>
+              <li>
+                <strong>13×13×255:</strong> Büyük nesneler için (3 anchor × 85)
+              </li>
+              <li>
+                <strong>26×26×255:</strong> Orta boyut nesneler için (3 anchor ×
+                85)
+              </li>
+              <li>
+                <strong>52×52×255:</strong> Küçük nesneler için (3 anchor × 85)
+              </li>
+              <li>
+                <strong>85 = 4 (bbox) + 1 (confidence) + 80 (classes)</strong>
+              </li>
+            </ul>
+
+            <div
+              class="architecture-diagram"
+              style="height: 200px; margin: 15px 0"
+            >
+              <div class="layer-box">52×52<br />Küçük</div>
+              <div class="layer-box">26×26<br />Orta</div>
+              <div class="layer-box">13×13<br />Büyük</div>
+              <div class="layer-box">FPN<br />Birleştir</div>
+            </div>
+          </div>
+          <div class="image-content" style="flex: 1">
+            <img
+              src="images/slayt7_multiscale.jpg"
+              alt="YOLO v3+ Multi-Scale Detection Sistemi"
+              loading="lazy"
+              class="slide-image expandable"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Slide 7.5: YOLO Loss Function ve Training Process -->
+      <div class="slide">
+        <h1>YOLO Loss Function ve Training Process</h1>
+        <div class="slide-content">
+          <div class="text-content">
+            <h2>Multi-Part Loss Function</h2>
+            <div class="code-block">
+              <pre><code>Loss = λ_coord × L_coord + L_conf + λ_noobj × L_noobj + L_class
+
+L_coord = Σ[i=0 to S²]Σ[j=0 to B] 𝟙ᵢⱼᵒᵇʲ [(xᵢ - x̂ᵢ)² + (yᵢ - ŷᵢ)²]
+        + Σ[i=0 to S²]Σ[j=0 to B] 𝟙ᵢⱼᵒᵇʲ [(√wᵢ - √ŵᵢ)² + (√hᵢ - √ĥᵢ)²]
+
+L_conf = Σ[i=0 to S²]Σ[j=0 to B] 𝟙ᵢⱼᵒᵇʲ (Cᵢ - Ĉᵢ)²
+       + λ_noobj × Σ[i=0 to S²]Σ[j=0 to B] 𝟙ᵢⱼⁿᵒᵒᵇʲ (Cᵢ - Ĉᵢ)²
+
+L_class = Σ[i=0 to S²] 𝟙ᵢᵒᵇʲ Σ[c∈classes] (pᵢ(c) - p̂ᵢ(c))²</code></pre>
+            </div>
+
+            <h3>Loss Bileşenleri</h3>
+            <ul>
+              <li>
+                <strong>L_coord:</strong> Bounding box koordinat hatası (λ_coord
+                = 5)
+              </li>
+              <li><strong>L_conf:</strong> Confidence score hatası</li>
+              <li><strong>L_class:</strong> Sınıflandırma hatası</li>
+              <li>
+                <strong>λ_noobj:</strong> No-object penalty (genellikle 0.5)
+              </li>
+            </ul>
+
+            <h3>Training Stratejisi</h3>
+            <ul>
+              <li><strong>Pre-training:</strong> ImageNet'te sınıflandırma</li>
+              <li>
+                <strong>Fine-tuning:</strong> Tespit verileri ile 135 epoch
+              </li>
+              <li>
+                <strong>Learning Rate:</strong> 0.001 → 0.0001 (75 epoch sonra)
+              </li>
+              <li>
+                <strong>Data Augmentation:</strong> Random scaling, translation
+              </li>
+            </ul>
+          </div>
+          <div class="image-content">
+            <img
+              src="images/slayt7_loss..jpg"
+              alt="YOLO Loss Function Visualization"
+              loading="lazy"
+              class="slide-image expandable"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Slide 7.6: Anchor Box Sistemleri ve Non-Maximum Suppression -->
+      <div class="slide">
+        <h1>Anchor Box Sistemleri ve NMS</h1>
+        <div class="slide-content">
+          <div class="text-content">
+            <h2>Anchor Box Stratejisi (YOLOv2+)</h2>
+            <ul>
+              <li>
+                <strong>K-means Clustering:</strong> Optimal anchor boyutlarını
+                belirleme
+              </li>
+              <li>
+                <strong>Dimension Clusters:</strong> Veri setindeki bounding
+                box'ları analiz
+              </li>
+              <li>
+                <strong>5 Anchor Box:</strong> YOLOv2'de en iyi performans
+              </li>
+            </ul>
+
+            <div class="code-block">
+              <pre><code># Anchor Box Generation (Pseudo-code)
+def generate_anchors(dataset_boxes):
+    # K-means clustering on box dimensions
+    widths_heights = [(box.w, box.h) for box in dataset_boxes]
+    anchors = kmeans(widths_heights, k=5)
+    
+    # Optimize for average IoU
+    avg_iou = calculate_avg_iou(anchors, dataset_boxes)
+    return anchors
+
+# Non-Maximum Suppression
+def nms(boxes, scores, threshold=0.5):
+    sorted_indices = np.argsort(scores)[::-1]
+    keep = []
+    
+    while len(sorted_indices) > 0:
+        keep.append(sorted_indices[0])
+        ious = calculate_iou(boxes[sorted_indices[0]],
+                           boxes[sorted_indices[1:]])
+        sorted_indices = sorted_indices[1:][ious < threshold]
+    
+    return keep</code></pre>
+            </div>
+
+            <h3>NMS (Non-Maximum Suppression)</h3>
+            <ul>
+              <li><strong>Problem:</strong> Çoklu tespit problemi</li>
+              <li><strong>Çözüm:</strong> IoU threshold ile filtreleme</li>
+              <li><strong>Threshold:</strong> Genellikle 0.5-0.7 arası</li>
+            </ul>
+          </div>
+          <div class="image-content">
+            <img
+              src="images/slayt7_anchor.jpg"
+              alt="Anchor Box ve NMS Visualization"
+              loading="lazy"
+              class="slide-image expandable"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Slide 7.7: Advanced Data Augmentation Techniques -->
+      <div class="slide">
+        <h1>Gelişmiş Data Augmentation Teknikleri</h1>
+        <div class="slide-content">
+          <div class="text-content">
+            <h2>Mosaic Augmentation (YOLOv4)</h2>
+            <ul>
+              <li>
+                <strong>4 Görüntü Birleştirme:</strong> Tek eğitim örneği için
+              </li>
+              <li>
+                <strong>Batch Normalization:</strong> Daha büyük mini-batch
+                etkisi
+              </li>
+              <li><strong>Küçük Nesne Tespiti:</strong> Gelişmiş performans</li>
+            </ul>
+
+            <div
+              class="comparison-grid"
+              style="grid-template-columns: 1fr 1fr; gap: 20px"
+            >
+              <div class="comparison-card">
+                <h4>Mosaic Augmentation</h4>
+                <div class="code-block">
+                  <pre><code># Pseudo-code
+def mosaic_augmentation(images):
+    # 4 görüntüyü birleştir
+    mosaic = combine_four_images(images)
+    # Bounding box'ları dönüştür
+    boxes = transform_boxes(boxes, mosaic)
+    return mosaic, boxes</code></pre>
+                </div>
+              </div>
+              <div class="comparison-card">
+                <h4>CutMix Technique</h4>
+                <div class="code-block">
+                  <pre><code># Pseudo-code
+def cutmix(img1, img2, labels1, labels2):
+    # Rastgele patch seç
+    bbox = random_bbox()
+    # İkinci görüntüden patch kes
+    img1[bbox] = img2[bbox]
+    # Label'ları birleştir
+    return img1, mix_labels</code></pre>
+                </div>
+              </div>
+            </div>
+
+            <h3>Diğer Augmentation Teknikleri</h3>
+            <ul>
+              <li><strong>MixUp:</strong> Görüntü ve label interpolasyonu</li>
+              <li><strong>Random Erasing:</strong> Rastgele bölge silme</li>
+              <li><strong>GridMask:</strong> Düzenli grid pattern maskeleme</li>
+              <li>
+                <strong>AutoAugment:</strong> Policy tabanlı otomatik
+                augmentation
+              </li>
+            </ul>
+
+            <h3>YOLOv5+ Self-Adaptive Anchor</h3>
+            <ul>
+              <li>
+                <strong>Genetik Algoritma:</strong> Optimal anchor boyutları
+              </li>
+              <li>
+                <strong>Cross-Stage Partial:</strong> CSP ağ yapısı ile
+                optimizasyon
+              </li>
+            </ul>
+          </div>
+          <div class="image-content">
+            <img
+              src="images/slayt7_augmentation.jpg"
+              alt="Data Augmentation Techniques"
+              loading="lazy"
+              class="slide-image expandable"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Slide 7.8: Network Architecture Deep Dive -->
+      <div class="slide">
+        <h1>Network Architecture: Detaylı Analiz</h1>
+        <div class="slide-content">
+          <div class="text-content">
+            <h2>Darknet-53 Backbone (YOLOv3)</h2>
+            <div
+              class="architecture-diagram"
+              style="height: 180px; margin: 15px 0"
+            >
+              <div
+                class="layer-box"
+                style="background: linear-gradient(135deg, #e74c3c, #c0392b)"
+              >
+                Input<br />416×416×3
+              </div>
+              <div
+                class="layer-box"
+                style="background: linear-gradient(135deg, #3498db, #2980b9)"
+              >
+                Conv<br />32 filters
+              </div>
+              <div
+                class="layer-box"
+                style="background: linear-gradient(135deg, #f39c12, #e67e22)"
+              >
+                Residual<br />Blocks
+              </div>
+              <div
+                class="layer-box"
+                style="background: linear-gradient(135deg, #27ae60, #229954)"
+              >
+                Feature<br />Maps
+              </div>
+            </div>
+
+            <div
+              class="comparison-grid"
+              style="grid-template-columns: 1fr 1fr; gap: 15px"
+            >
+              <div class="comparison-card">
+                <h4>CSPDarknet53 (YOLOv4/v5)</h4>
+                <ul style="font-size: 1rem">
+                  <li>
+                    <strong>Cross Stage Partial:</strong> Gradient flow
+                    optimizasyonu
+                  </li>
+                  <li>
+                    <strong>Mish Activation:</strong> f(x) = x ×
+                    tanh(softplus(x))
+                  </li>
+                  <li>
+                    <strong>DropBlock Regularization:</strong> Spatial dropout
+                  </li>
+                </ul>
+              </div>
+              <div class="comparison-card">
+                <h4>EfficientNet (YOLOv5+)</h4>
+                <ul style="font-size: 1rem">
+                  <li>
+                    <strong>Compound Scaling:</strong> Depth, width, resolution
+                  </li>
+                  <li>
+                    <strong>MBConv Blocks:</strong> Mobile-friendly convolutions
+                  </li>
+                  <li><strong>SE Attention:</strong> Squeeze-and-Excitation</li>
+                </ul>
+              </div>
+            </div>
+
+            <h3>Neck ve Head Mimarisi</h3>
+            <ul>
+              <li>
+                <strong>PANet (Path Aggregation):</strong> Bottom-up path
+                augmentation
+              </li>
+              <li>
+                <strong>FPN (Feature Pyramid):</strong> Multi-scale feature
+                fusion
+              </li>
+              <li>
+                <strong>YOLO Head:</strong> Class + Objectness + BBox regression
+              </li>
+            </ul>
+
+            <div class="code-block">
+              <pre><code># YOLOv5 Model Configuration
+model:
+  backbone:
+    - [Focus, [64, 3]]  # P1/2
+    - [Conv, [128, 3, 2]]  # P2/4
+    - [C3, [128]]
+    - [Conv, [256, 3, 2]]  # P3/8
+  
+  neck:
+    - [Conv, [512, 1, 1]]
+    - [nn.Upsample, [None, 2, 'nearest']]
+    - [Concat, [1]]  # cat backbone P4
+  
+  head:
+    - [Detect, [nc, anchors]]  # Detect(P3, P4, P5)</code></pre>
+            </div>
+          </div>
+          <div class="image-content">
+            <img
+              src="images/slayt5.jpg"
+              alt="Network Architecture Diagram"
+              loading="lazy"
+              class="slide-image expandable"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Slide 7.9: Evaluation Metrics ve Performance Analysis -->
+      <div class="slide">
+        <h1>Evaluation Metrics ve Performance Analysis</h1>
+        <div class="slide-content">
+          <div class="text-content">
+            <h2>Object Detection Metrics</h2>
+            <div
+              class="comparison-grid"
+              style="grid-template-columns: 1fr 1fr; gap: 15px"
+            >
+              <div class="comparison-card">
+                <h4>IoU (Intersection over Union)</h4>
+                <div class="code-block" style="font-size: 0.8rem">
+                  <pre><code>IoU = Area of Overlap / Area of Union
+IoU = |A ∩ B| / |A ∪ B|
+
+# Pseudo-code
+def calculate_iou(box1, box2):
+    x1 = max(box1[0], box2[0])
+    y1 = max(box1[1], box2[1])
+    x2 = min(box1[2], box2[2])
+    y2 = min(box1[3], box2[3])
+    
+    intersection = max(0, x2-x1) * max(0, y2-y1)
+    union = box1_area + box2_area - intersection
+    return intersection / union</code></pre>
+                </div>
+              </div>
+              <div class="comparison-card">
+                <h4>mAP (mean Average Precision)</h4>
+                <div class="code-block" style="font-size: 0.8rem">
+                  <pre><code>AP = ∫₀¹ P(R) dR
+
+mAP@0.5 = Average AP at IoU=0.5
+mAP@0.5:0.95 = Average AP from IoU=0.5 to 0.95
+
+# COCO Evaluation
+for each_class:
+    AP = calculate_AP(precision, recall)
+mAP = mean(all_class_APs)</code></pre>
+                </div>
+              </div>
+            </div>
+
+            <h3>YOLO Specific Metrics</h3>
+            <ul>
+              <li>
+                <strong>Confidence Threshold:</strong> Nesne varlık eşik değeri
+                (0.25-0.5)
+              </li>
+              <li>
+                <strong>NMS Threshold:</strong> Çoklu tespit eliminasyonu
+                (0.45-0.7)
+              </li>
+              <li>
+                <strong>FPS (Frames Per Second):</strong> Gerçek zamanlı
+                performans
+              </li>
+              <li>
+                <strong>Model Size:</strong> MB cinsinden depolama gereksinimi
+              </li>
+            </ul>
+
+            <h3>Benchmark Sonuçları (COCO Dataset)</h3>
+            <ul>
+              <li>
+                <strong>YOLOv3:</strong> 31.0% mAP@0.5:0.95, 22ms inference
+              </li>
+              <li>
+                <strong>YOLOv4:</strong> 43.5% mAP@0.5:0.95, 23ms inference
+              </li>
+              <li>
+                <strong>YOLOv5s:</strong> 37.4% mAP@0.5:0.95, 6.4ms inference
+              </li>
+              <li>
+                <strong>YOLOv8n:</strong> 37.3% mAP@0.5:0.95, 8.7ms inference
+              </li>
+            </ul>
+          </div>
+          <div class="image-content">
+            <img
+              src="images/slayt7_metrics.jpg"
+              alt="Evaluation Metrics Visualization"
+              loading="lazy"
+              class="slide-image expandable"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Slide 7.10: Matematiksel Temeller ve Teorik Analiz -->
+      <div class="slide">
+        <h1>Matematiksel Temeller ve Teorik Analiz</h1>
+        <div class="slide-content">
+          <div class="text-content">
+            <h2>YOLO'nun Matematiksel Formülasyonu</h2>
+            <div class="code-block">
+              <pre><code>P(Object) = σ(t₀)
+bₓ = σ(tₓ) + cₓ
+b_y = σ(t_y) + c_y
+bw = pw * exp(tw)
+bh = ph * exp(th)
+
+# Objectness Score
+confidence = P(Object) * IoU(pred_box, ground_truth)
+
+# Class Probability
+P(Class_i | Object) = softmax(class_scores_i)</code></pre>
+            </div>
+
+            <h3>Sigmoid ve Exponential Functions</h3>
+            <ul>
+              <li>
+                <strong>σ(x) = 1/(1 + e^(-x)):</strong> Bounding box center
+                normalizasyonu
+              </li>
+              <li>
+                <strong>exp(tw), exp(th):</strong> Width/height tahminleri için
+                logaritmik alan
+              </li>
+              <li>
+                <strong>Anchor Priors:</strong> pw, ph önceden tanımlı anchor
+                boyutları
+              </li>
+            </ul>
+
+            <div
+              class="comparison-grid"
+              style="grid-template-columns: 1fr 1fr; gap: 15px"
+            >
+              <div class="comparison-card">
+                <h4>Bayesian Interpretation</h4>
+                <div class="code-block" style="font-size: 0.75rem">
+                  <pre><code># Posterior Probability
+P(class|box) ∝ P(box|class) * P(class)
+
+# Maximum Likelihood Estimation
+θ* = argmax Σ log P(y_i|x_i, θ)
+
+# Regularization Term
+L_total = L_data + λ * L_regularization</code></pre>
+                </div>
+              </div>
+              <div class="comparison-card">
+                <h4>Gradient Flow Analysis</h4>
+                <div class="code-block" style="font-size: 0.75rem">
+                  <pre><code># Chain Rule Application
+∂L/∂w = ∂L/∂y * ∂y/∂w
+
+# Gradient Clipping
+g = clip(g, -max_norm, max_norm)
+
+# Momentum Update
+v_t = β*v_{t-1} + (1-β)*g_t
+w_t = w_{t-1} - α*v_t</code></pre>
+                </div>
+              </div>
+            </div>
+
+            <h3>Information Theory Perspective</h3>
+            <ul>
+              <li>
+                <strong>Cross-Entropy Loss:</strong> -Σ y_i * log(ŷ_i) bilgi
+                teorisi temeli
+              </li>
+              <li>
+                <strong>KL Divergence:</strong> Model ve gerçek dağılım
+                arasındaki fark
+              </li>
+              <li>
+                <strong>Mutual Information:</strong> Feature ve label arasındaki
+                bağımlılık
+              </li>
+            </ul>
+          </div>
+          <div class="image-content">
+            <img
+              src="images/slayt5.jpg"
+              alt="Matematiksel Formülasyon"
+              loading="lazy"
+              class="slide-image expandable"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Slide 7.11: YOLO vs Other Detection Methods -->
+      <div class="slide">
+        <h1>YOLO vs Diğer Tespit Yöntemleri</h1>
+        <div class="slide-content">
+          <div class="text-content">
+            <h2>Karşılaştırmalı Analiz</h2>
+            <div
+              class="comparison-grid"
+              style="grid-template-columns: repeat(3, 1fr); gap: 15px"
+            >
+              <div class="comparison-card">
+                <h4>R-CNN Family</h4>
+                <ul style="font-size: 1rem">
+                  <li><strong>R-CNN:</strong> ~47s/image</li>
+                  <li><strong>Fast R-CNN:</strong> ~2.3s/image</li>
+                  <li><strong>Faster R-CNN:</strong> ~0.2s/image</li>
+                  <li><strong>Mask R-CNN:</strong> Instance segmentation</li>
+                </ul>
+              </div>
+              <div class="comparison-card">
+                <h4>SSD (Single Shot)</h4>
+                <ul style="font-size: 1rem">
+                  <li><strong>SSD300:</strong> 59 FPS, 74.3% mAP</li>
+                  <li><strong>SSD512:</strong> 22 FPS, 76.9% mAP</li>
+                  <li><strong>Multi-scale:</strong> 6 farklı feature map</li>
+                  <li><strong>Default boxes:</strong> Anchor benzeri</li>
+                </ul>
+              </div>
+              <div class="comparison-card">
+                <h4>RetinaNet</h4>
+                <ul style="font-size: 1rem">
+                  <li><strong>Focal Loss:</strong> Class imbalance çözümü</li>
+                  <li><strong>FPN Backbone:</strong> Multi-scale features</li>
+                  <li><strong>Performance:</strong> 39.1% mAP@0.5:0.95</li>
+                  <li><strong>Dense prediction:</strong> Her pixel tahmin</li>
+                </ul>
+              </div>
+            </div>
+
+            <h3>YOLO'nun Avantajları</h3>
+            <ul>
+              <li>
+                <strong>Unified Architecture:</strong> End-to-end tek model
+              </li>
+              <li>
+                <strong>Real-time Performance:</strong> Video işleme için ideal
+              </li>
+              <li>
+                <strong>Global Context:</strong> Tüm görüntü bilgisini kullanır
+              </li>
+              <li><strong>Simple Pipeline:</strong> Kolay implementasyon</li>
+            </ul>
+
+            <h3>Trade-offs ve Limitasyonlar</h3>
+            <ul>
+              <li><strong>Small Objects:</strong> Küçük nesnelerde zorlanma</li>
+              <li>
+                <strong>Aspect Ratio:</strong> Unusual ratios için problem
+              </li>
+              <li>
+                <strong>Localization:</strong> Fine-grained lokalizasyon hatası
+              </li>
+            </ul>
+
+            <div class="code-block">
+              <pre><code># Performance Comparison (COCO Dataset)
+Method          | mAP@0.5:0.95 | FPS   | Model Size
+----------------|--------------|-------|------------
+Faster R-CNN    | 42.7%        | 7     | 522 MB
+SSD512         | 28.8%        | 22    | 91 MB
+RetinaNet      | 39.1%        | 13    | 145 MB
+YOLOv3         | 31.0%        | 35    | 248 MB
+YOLOv5s        | 37.4%        | 140   | 14 MB
+YOLOv8n        | 37.3%        | 80    | 6.2 MB</code></pre>
+            </div>
+          </div>
+          <div class="image-content">
+            <img
+              src="images/slayt4.jpg"
+              alt="YOLO vs Other Methods Comparison"
+              loading="lazy"
+              class="slide-image expandable"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Slide 7.12: Real-world Challenges ve Gelecek Yönelimler -->
+      <div class="slide">
+        <h1>Real-world Challenges ve Gelecek Yönelimler</h1>
+        <div class="slide-content">
+          <div class="text-content">
+            <h2>Güncel Zorluklar</h2>
+            <div
+              class="comparison-grid"
+              style="grid-template-columns: 1fr 1fr; gap: 20px"
+            >
+              <div class="comparison-card">
+                <h4>❌ Teknik Zorluklar</h4>
+                <ul style="font-size: 1rem">
+                  <li>
+                    <strong>Domain Shift:</strong> Farklı ortamlarda performans
+                    kaybı
+                  </li>
+                  <li>
+                    <strong>Long-tail Distribution:</strong> Nadir sınıflar için
+                    yetersiz data
+                  </li>
+                  <li>
+                    <strong>Adversarial Attacks:</strong> Kasıtlı yanıltma
+                    saldırıları
+                  </li>
+                  <li>
+                    <strong>Multi-scale Objects:</strong> Aşırı küçük/büyük
+                    nesneler
+                  </li>
+                </ul>
+              </div>
+              <div class="comparison-card">
+                <h4>✅ Çözüm Yaklaşımları</h4>
+                <ul style="font-size: 1rem">
+                  <li>
+                    <strong>Domain Adaptation:</strong> Transfer learning
+                    teknikleri
+                  </li>
+                  <li>
+                    <strong>Data Synthesis:</strong> Synthetic data generation
+                  </li>
+                  <li>
+                    <strong>Robust Training:</strong> Adversarial training
+                    methods
+                  </li>
+                  <li>
+                    <strong>Multi-resolution:</strong> Pyramid-based approaches
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            <h3>Edge Computing Challenges</h3>
+            <ul>
+              <li>
+                <strong>Memory Constraints:</strong> Mobil cihazlarda RAM
+                limitasyonu
+              </li>
+              <li>
+                <strong>Power Consumption:</strong> Battery life optimizasyonu
+              </li>
+              <li>
+                <strong>Latency Requirements:</strong> Real-time inference
+                gereksinimleri
+              </li>
+              <li>
+                <strong>Model Compression:</strong> Quantization ve pruning
+                ihtiyacı
+              </li>
+            </ul>
+
+            <div class="code-block">
+              <pre><code># Gelecek Araştırma Yönelimler
+1. Few-shot Learning: Az veriyle öğrenme
+2. Neural Architecture Search (NAS): Otomatik model tasarımı
+3. Continual Learning: Sürekli öğrenme sistemleri
+4. Federated Learning: Dağıtık öğrenme modelleri
+5. Multi-modal Fusion: Görüntü + Metin + Audio
+6. 3D Object Detection: LiDAR + Camera integration
+7. Video Understanding: Temporal consistency
+8. Edge-Cloud Hybrid: Dynamic model deployment</code></pre>
+            </div>
+          </div>
+          <div class="image-content">
+            <img
+              src="images/slayt11_new.jpg"
+              alt="Future Challenges and Directions"
+              loading="lazy"
+              class="slide-image expandable"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Slide 7.13: Edge Deployment ve Optimizasyon Teknikleri -->
+      <div class="slide">
+        <h1>Edge Deployment ve Optimizasyon</h1>
+        <div class="slide-content">
+          <div class="text-content">
+            <h2>Model Optimizasyon Teknikleri</h2>
+            <div
+              class="comparison-grid"
+              style="grid-template-columns: 1fr 1fr; gap: 15px"
+            >
+              <div class="comparison-card">
+                <h4>Quantization Techniques</h4>
+                <ul style="font-size: 0.95rem">
+                  <li>
+                    <strong>INT8 Quantization:</strong> 32-bit → 8-bit dönüşüm
+                  </li>
+                  <li>
+                    <strong>Post-training:</strong> Eğitim sonrası quantization
+                  </li>
+                  <li>
+                    <strong>Quantization-aware:</strong> Eğitim sırasında
+                    quantization
+                  </li>
+                  <li><strong>4x speedup:</strong> Inference hızında artış</li>
+                </ul>
+              </div>
+              <div class="comparison-card">
+                <h4>Model Compression</h4>
+                <ul style="font-size: 0.95rem">
+                  <li>
+                    <strong>Pruning:</strong> Gereksiz bağlantıları kaldırma
+                  </li>
+                  <li>
+                    <strong>Knowledge Distillation:</strong> Teacher-student
+                    learning
+                  </li>
+                  <li>
+                    <strong>Neural Architecture Search:</strong> Optimal model
+                    keşfi
+                  </li>
+                  <li>
+                    <strong>MobileNet blocks:</strong> Depthwise separable conv
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            <h3>Hardware-specific Optimization</h3>
+            <ul>
+              <li>
+                <strong>TensorRT (NVIDIA):</strong> GPU inference optimizasyonu
+              </li>
+              <li><strong>OpenVINO (Intel):</strong> CPU/VPU deployment</li>
+              <li>
+                <strong>Core ML (Apple):</strong> iOS deployment framework
+              </li>
+              <li><strong>TensorFlow Lite:</strong> Mobile/IoT devices</li>
+            </ul>
+
+            <div class="code-block">
+              <pre><code># Edge Deployment Pipeline
+# 1. Model Training
+model = YOLOv8('yolov8n.pt')
+model.train(data='coco.yaml', epochs=100)
+
+# 2. Model Export
+model.export(format='onnx')  # ONNX format
+model.export(format='trt')   # TensorRT
+model.export(format='coreml') # Core ML
+
+# 3. Quantization
+from ultralytics import YOLO
+model = YOLO('yolov8n.pt')
+model.export(format='onnx', int8=True)  # INT8 quantization
+
+# 4. Benchmark Testing
+results = model.benchmark(device='0')  # GPU benchmark</code></pre>
+            </div>
+
+            <h3>Performance Metrics</h3>
+            <ul>
+              <li><strong>Latency:</strong> Inference süresi (ms)</li>
+              <li><strong>Throughput:</strong> Saniye başına işlenen frame</li>
+              <li><strong>Memory Usage:</strong> RAM kullanımı (MB)</li>
+              <li><strong>Power Consumption:</strong> Enerji tüketimi (W)</li>
+            </ul>
+          </div>
+          <div class="image-content">
+            <img
+              src="images/slayt7_edge.jpg"
+              alt="Edge Deployment Architecture"
+              loading="lazy"
+              class="slide-image expandable"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Slide 8: YOLO'nun Evrimi: v1 - v5 -->
+      <div class="slide">
+        <h1>YOLO'nun Evrimi: v1 - v5 (2016-2020)</h1>
+        <div class="slide-content reverse">
+          <div class="text-content">
+            <div
+              class="comparison-grid"
+              style="
+                grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+                gap: 15px;
+              "
+            >
+              <div class="comparison-card">
+                <h4>YOLOv1 (2016)</h4>
+                <ul>
+                  <li>
+                    İlk "You Only Look Once" algoritması, tek aşamada tespit.
+                  </li>
+                  <li>7×7 grid sistem ile 49 hücreye bölme.</li>
+                  <li>45 FPS hızında gerçek zamanlı çalışma.</li>
+                </ul>
+              </div>
+              <div class="comparison-card">
+                <h4>YOLOv2/YOLO9000 (2017)</h4>
+                <ul>
+                  <li>Batch normalization ve anchor boxes eklendi.</li>
+                  <li>Darknet-19 backbone ile daha iyi özellik çıkarma.</li>
+                  <li>9000+ sınıf tespiti yapabilme kabiliyeti.</li>
+                </ul>
+              </div>
+              <div class="comparison-card">
+                <h4>YOLOv3 (2018)</h4>
+                <ul>
+                  <li>Multi-scale prediction ile 3 farklı ölçekte tespit.</li>
+                  <li>Darknet-53 backbone, FPN benzeri yapı.</li>
+                  <li>Logistic regression ile daha iyi bbox tahminleri.</li>
+                </ul>
+              </div>
+              <div class="comparison-card">
+                <h4>YOLOv4 (2020)</h4>
+                <ul>
+                  <li>CSPDarknet53 backbone ve PANet neck.</li>
+                  <li>Mosaic augmentation ve CutMix teknikleri.</li>
+                  <li>COCO'da %65.7 mAP ile rekor kırma performansı.</li>
+                </ul>
+              </div>
+              <div class="comparison-card">
+                <h4>YOLOv5 (2020)</h4>
+                <ul>
+                  <li>Ultralytics tarafından PyTorch'ta yeniden yazım.</li>
+                  <li>Focus layer ve Auto-anchor optimizasyonları.</li>
+                  <li>5 farklı model boyutu: n, s, m, l, x versiyonları.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          <div class="image-content">
+            <img
+              src="images/slayt7.jpg"
+              alt="YOLO v1-v5 Evrimi Zaman Çizelgesi"
+              loading="lazy"
+              class="slide-image expandable"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Slide 9: YOLO'nun Evrimi (Güncellenmiş) -->
+      <div class="slide">
+        <h1>YOLO'nun Evrimi: 2022-2025</h1>
+        <div class="slide-content reverse">
+          <div class="text-content">
+            <div
+              class="comparison-grid"
+              style="
+                grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+                gap: 15px;
+              "
+            >
+              <div class="comparison-card">
+                <h4>YOLOv6 (2022)</h4>
+                <ul>
+                  <li>
+                    Meituan tarafından, daha hızlı inference için geliştirildi.
+                  </li>
+                  <li>Verimli ve esnek endüstriyel bir framework sunar.</li>
+                </ul>
+              </div>
+              <div class="comparison-card">
+                <h4>YOLOv7 (2022)</h4>
+                <ul>
+                  <li>En iyi doğruluk/hız dengesini sundu.</li>
+                  <li>30 FPS'de %56.8 AP (COCO) başarımı.</li>
+                </ul>
+              </div>
+              <div class="comparison-card">
+                <h4>YOLOv8 (2023)</h4>
+                <ul>
+                  <li>Ultralytics'ten, yeni backbone ve anchor-free yapı.</li>
+                  <li>Kullanımı kolay, esnek ve ölçeklenebilir.</li>
+                </ul>
+              </div>
+              <div class="comparison-card">
+                <h4>YOLOv9 (2024)</h4>
+                <ul>
+                  <li>Programmable Gradient Information (PGI) konsepti.</li>
+                  <li>Derin ağlarda bilgi kaybını önlemeyi hedefler.</li>
+                </ul>
+              </div>
+              <div class="comparison-card">
+                <h4>YOLOv10 (2024)</h4>
+                <ul>
+                  <li>
+                    NMS-free training ile gerçek zamanlı end-to-end mimari.
+                  </li>
+                  <li>Düşük gecikme ve yüksek verimlilik sağlar.</li>
+                </ul>
+              </div>
+              <div class="comparison-card">
+                <h4>YOLOv11 (2024)</h4>
+                <ul>
+                  <li>Ultralytics'in en yeni ve gelişmiş versiyonu.</li>
+                  <li>Önceki modellere göre artırılmış doğruluk ve hız.</li>
+                </ul>
+              </div>
+              <div class="comparison-card">
+                <h4>YOLO-NAS</h4>
+                <ul>
+                  <li>
+                    Neural Architecture Search ile donanıma özel optimizasyon.
+                  </li>
+                  <li>Yüksek performanslı ve verimli mimari.</li>
+                </ul>
+              </div>
+              <div class="comparison-card">
+                <h4>YOLO-World</h4>
+                <ul>
+                  <li>Açık kelime (open-vocabulary) ile nesne tespiti.</li>
+                  <li>Modeli yeniden eğitmeden yeni nesneleri tanır.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          <div class="image-content">
+            <img
+              src="images/slayt7.jpg"
+              alt="YOLO'nun Evrimi Zaman Çizelgesi"
+              loading="lazy"
+              class="slide-image expandable"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Slide 8: Modern YOLO Kullanımı (Kod Örneği) -->
+      <div class="slide">
+        <h1>Modern YOLO Kullanımı: Kod Örneği</h1>
+        <div class="slide-content">
+          <div class="text-content">
+            <h2>Ultralytics YOLOv8 ile Nesne Tespiti</h2>
+            <p>
+              Güncel kütüphanelerle YOLO'yu kullanmak oldukça
+              basitleştirilmiştir. İşte <code>ultralytics</code> kütüphanesi ile
+              bir örnek:
+            </p>
+            <div class="code-block">
+              <pre
+                class="language-python"
+              ><code class="language-python"># Gerekli kütüphaneyi yükleyin: pip install ultralytics
+ from ultralytics import YOLO
+ from PIL import Image
+ 
+ # Önceden eğitilmiş YOLOv8 modelini yükle
+ model = YOLO('yolov8n.pt') # 'n' nano model, en hızlısı
+ 
+ # Bir görüntü üzerinde tahmin yap
+ results = model('path/to/your/image.jpg')
+ 
+ # Sonuçları işle ve göster
+ for r in results:
+     im_array = r.plot()  # Tespitleri içeren BGR numpy array'i
+     im = Image.fromarray(im_array[..., ::-1])  # RGB'ye dönüştür
+     im.show()  # Görüntüyü göster
+     im.save('results.jpg')  # Sonucu kaydet
+ </code></pre>
+            </div>
+            <h3>Kodun Açıklaması</h3>
+            <ul>
+              <li>
+                <strong>Model Yükleme:</strong> Tek satır kod ile önceden
+                eğitilmiş bir modeli (<code>yolov8n.pt</code>) yüklüyoruz.
+              </li>
+              <li>
+                <strong>Tahmin:</strong> Modeli bir görüntü ile çağırmak,
+                tespiti gerçekleştirmek için yeterlidir.
+              </li>
+              <li>
+                <strong>Görselleştirme:</strong>
+                <code>.plot()</code> metodu, tespit sonuçlarını orijinal görüntü
+                üzerine kolayca çizmemizi sağlar.
+              </li>
+            </ul>
+          </div>
+          <div class="image-content">
+            <img
+              src="images/slayt8_code.jpg"
+              alt="Ultralytics Kodu Örneği"
+              loading="lazy"
+              class="slide-image expandable"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Slide 9: Güncel Uygulama Alanları -->
+      <div class="slide app-grid-slide">
+        <h1>Güncel Uygulama Alanları (2025)</h1>
+        <div class="image-grid-2x2">
+          <img
+            src="images/slayt10.1.jpg"
+            alt="Otonom Sürüş Uygulaması"
+            loading="lazy"
+            class="grid-image expandable"
+          />
+          <img
+            src="images/slayt10.2.jpg"
+            alt="Perakende Analitiği Uygulaması"
+            loading="lazy"
+            class="grid-image expandable"
+          />
+          <img
+            src="images/slayt10.3.jpg"
+            alt="Güvenlik Sistemi Uygulaması"
+            loading="lazy"
+            class="grid-image expandable"
+          />
+          <img
+            src="images/slayt10.4.jpg"
+            alt="Tarım Teknolojileri Uygulaması"
+            loading="lazy"
+            class="grid-image expandable"
+          />
+        </div>
+      </div>
+
+      <!-- Slide 9.1: Farklı Uygulama Alanları -->
+      <div class="slide app-grid-slide">
+        <h1>Farklı Uygulama Alanları</h1>
+        <div class="image-grid-2x2">
+          <img
+            src="images/slayt9.1.jpg"
+            alt="Sağlık Sektöründe Tümör Tespiti"
+            loading="lazy"
+            class="grid-image expandable"
+          />
+          <img
+            src="images/slayt9.2.jpg"
+            alt="Tarım Teknolojilerinde Hastalık Tespiti"
+            loading="lazy"
+            class="grid-image expandable"
+          />
+          <img
+            src="images/slayt9.3.jpg"
+            alt="Endüstriyel Otomasyonda Kalite Kontrol"
+            loading="lazy"
+            class="grid-image expandable"
+          />
+          <img
+            src="images/slayt9.4.jpg"
+            alt="Güvenlik ve Gözetimde İhlal Tespiti"
+            loading="lazy"
+            class="grid-image expandable"
+          />
+        </div>
+      </div>
+
+      <!-- Slide 10: Performans, Avantajlar ve Dezavantajlar -->
+      <div class="slide four-image-slide">
+        <h1>Performans ve Metrikler (2025)</h1>
+        <div class="pros-cons">
+          <div class="pros">
+            <h3>✅ Avantajlar</h3>
+            <ul>
+              <li>
+                <strong>Hız & Verimlilik:</strong> NMS-free gibi yeniliklerle
+                rakipsiz hız.
+              </li>
+              <li>
+                <strong>Kullanım Kolaylığı:</strong> Ultralytics gibi
+                framework'ler.
+              </li>
+              <li>
+                <strong>Esneklik:</strong> Anchor-free, open-vocabulary
+                modeller.
+              </li>
+              <li>
+                <strong>Edge Optimizasyonu:</strong> Mobil cihazlarda yüksek
+                performans.
+              </li>
+            </ul>
+          </div>
+          <div class="cons">
+            <h3>❌ Gelişim Alanları</h3>
+            <ul>
+              <li>
+                <strong>Karmaşık Sahneler:</strong> Çok kalabalık ve örtüşen
+                nesneler.
+              </li>
+              <li>
+                <strong>Açıklanabilirlik (XAI):</strong> Karar mekanizmalarının
+                şeffaflığı.
+              </li>
+              <li>
+                <strong>Veri Bağımlılığı:</strong> Geniş ve çeşitli veri
+                setlerine ihtiyaç.
+              </li>
+            </ul>
+          </div>
+        </div>
+        <h2>Güncel Performans Metrikleri</h2>
+        <ul>
+          <li>
+            <strong>YOLOv11:</strong> COCO'da %54.7 mAP@0.5:0.95 ile yüksek
+            doğruluk.
+          </li>
+          <li>
+            <strong>YOLOv10:</strong> 300+ FPS hızda %53.4 mAP, gerçek zamanlı
+            end-to-end.
+          </li>
+          <li>
+            <strong>Real-time Inference:</strong> Tesla V100'de 1ms altı
+            gecikme.
+          </li>
+          <li>
+            <strong>Mobil Modeller:</strong> YOLOv8n, YOLOv11n ile edge
+            cihazlarda verimlilik.
+          </li>
+        </ul>
+      </div>
+
+      <!-- Slide 11: Araştırma Trendleri ve Gelecek -->
+      <div class="slide">
+        <h1>Araştırma Trendleri ve Gelecek</h1>
+        <div class="slide-content">
+          <div class="text-content">
+            <div class="comparison-grid">
+              <div class="comparison-card">
+                <h4>Vision Transformers (ViT)</h4>
+                <ul>
+                  <li>
+                    CNN'ler ile hibrit çalışan backbone'lar ve global context.
+                  </li>
+                </ul>
+              </div>
+              <div class="comparison-card">
+                <h4>Few-shot & Open-Vocabulary</h4>
+                <ul>
+                  <li>
+                    Az örnekle öğrenme ve YOLO-World ile "Detect Anything".
+                  </li>
+                </ul>
+              </div>
+              <div class="comparison-card">
+                <h4>Edge Computing Optimizasyonu</h4>
+                <ul>
+                  <li>
+                    Model quantizasyonu ve donanıma özel derleme (örn.
+                    TensorRT).
+                  </li>
+                </ul>
+              </div>
+              <div class="comparison-card">
+                <h4>Multi-Modal & 3D Tespit</h4>
+                <ul>
+                  <li>
+                    Görüntü, metin ve LiDAR verilerini birleştirme, 3D algılama.
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          <div class="image-content">
+            <img
+              src="images/slayt11_new.jpg"
+              alt="YOLO Araştırma Trendleri ve Gelecek Vizyonu"
+              loading="lazy"
+              class="slide-image expandable"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Slide 11.5: Akademik Referanslar ve Kaynaklar -->
+      <div class="slide">
+        <h1>Akademik Referanslar ve Kaynaklar</h1>
+        <div class="slide-content">
+          <div class="text-content">
+            <h2>Temel YOLO Makaleleri</h2>
+            <ul style="font-size: 1rem; line-height: 1.4">
+              <li>
+                <strong>Redmon, J., et al. (2016).</strong> "You Only Look Once:
+                Unified, Real-Time Object Detection." CVPR 2016.
+              </li>
+              <li>
+                <strong>Redmon, J., Farhadi, A. (2017).</strong> "YOLO9000:
+                Better, Faster, Stronger." CVPR 2017.
+              </li>
+              <li>
+                <strong>Redmon, J., Farhadi, A. (2018).</strong> "YOLOv3: An
+                Incremental Improvement." arXiv preprint.
+              </li>
+              <li>
+                <strong>Bochkovskiy, A., et al. (2020).</strong> "YOLOv4:
+                Optimal Speed and Accuracy of Object Detection." CVPR 2020.
+              </li>
+            </ul>
+
+            <h2>Güncel Gelişmeler</h2>
+            <ul style="font-size: 1rem; line-height: 1.4">
+              <li>
+                <strong>Wang, C.Y., et al. (2022).</strong> "YOLOv7: Trainable
+                bag-of-freebies sets new state-of-the-art." CVPR 2022.
+              </li>
+              <li>
+                <strong>Ultralytics (2023).</strong> "YOLOv8: A new
+                state-of-the-art YOLO model." Technical Report.
+              </li>
+              <li>
+                <strong>Wang, A., et al. (2024).</strong> "YOLOv9: Learning What
+                You Want to Learn Using Programmable Gradient Information."
+                arXiv preprint.
+              </li>
+              <li>
+                <strong>Wang, A., et al. (2024).</strong> "YOLOv10: Real-Time
+                End-to-End Object Detection." arXiv preprint.
+              </li>
+            </ul>
+
+            <h2>İlgili Araştırma Alanları</h2>
+            <ul style="font-size: 1rem; line-height: 1.4">
+              <li>
+                <strong>Lin, T.Y., et al. (2017).</strong> "Focal Loss for Dense
+                Object Detection." ICCV 2017. (RetinaNet)
+              </li>
+              <li>
+                <strong>Liu, W., et al. (2016).</strong> "SSD: Single Shot
+                MultiBox Detector." ECCV 2016.
+              </li>
+              <li>
+                <strong>Ren, S., et al. (2015).</strong> "Faster R-CNN: Towards
+                Real-Time Object Detection." NIPS 2015.
+              </li>
+            </ul>
+
+            <h2>Veri Setleri ve Benchmark</h2>
+            <ul style="font-size: 1rem; line-height: 1.4">
+              <li>
+                <strong>Lin, T.Y., et al. (2014).</strong> "Microsoft COCO:
+                Common Objects in Context." ECCV 2014.
+              </li>
+              <li>
+                <strong>Everingham, M., et al. (2010).</strong> "The Pascal
+                Visual Object Classes (VOC) Challenge." IJCV 2010.
+              </li>
+            </ul>
+
+            <div
+              style="
+                margin-top: 20px;
+                padding: 15px;
+                background: rgba(30, 60, 114, 0.1);
+                border-radius: 10px;
+              "
+            >
+              <p
+                style="
+                  font-size: 0.95rem;
+                  color: #666;
+                  text-align: center;
+                  margin: 0;
+                "
+              >
+                <strong>Not:</strong> Bu sunum akademik araştırma amaçlıdır. Tüm
+                kaynak kodlar ve veri setleri ilgili lisanslar altında
+                kullanılmıştır.
+              </p>
+            </div>
+          </div>
+          <div class="image-content">
+            <img
+              src="images/slayt12_new.jpg"
+              alt="Academic References"
+              loading="lazy"
+              class="slide-image expandable"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Slide 12: Sonuç -->
+      <div class="slide">
+        <h1>Sonuç</h1>
+        <div class="slide-content reverse">
+          <div class="text-content">
+            <ul>
+              <li>
+                <strong>Sürekli Devrim:</strong> YOLO, nesne tespitinde
+                sınırları zorlamaya devam ediyor.
+              </li>
+              <li>
+                <strong>Erişilebilirlik:</strong> Güçlü açık kaynak topluluğu ve
+                araçları ile herkesin kullanımına açık.
+              </li>
+              <li>
+                <strong>Gelecek Vizyonu:</strong> Daha akıllı, daha hızlı ve
+                daha genel amaçlı tespit sistemlerine doğru ilerliyor.
+              </li>
+              <li>
+                <strong>Pratik Etki:</strong> Akademik araştırmalardan
+                endüstriyel uygulamalara kadar geniş bir yelpazede somut
+                çözümler sunuyor.
+              </li>
+            </ul>
+            <div class="conclusion-academic" style="margin-top: auto">
+              <p class="university">Burdur Mehmet Akif Ersoy Üniversitesi</p>
+              <p class="course">Yüksek Lisans Yapay Zeka Dersi</p>
+              <p class="instructor">Ders Öğretmeni: Elvan Duman</p>
+              <p class="authors">
+                Proje Hazırlayanlar: Engin DALGA - Onur ŞAKRAKER
+              </p>
+            </div>
+          </div>
+          <div class="image-content">
+            <img
+              src="images/slayt12_new.jpg"
+              alt="YOLO Evrimi ve Gelecek Vizyonu İnfografiği"
+              loading="lazy"
+              class="slide-image expandable"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Image Modal -->
+    <div id="imageModal" class="image-modal">
+      <span class="close-modal">&times;</span>
+      <img class="modal-content" id="modalImage" />
+    </div>
+
+    <!-- Navigation Controls -->
+    <div class="nav-controls">
+      <button class="nav-btn" id="prevBtn" onclick="changeSlide(-1)">‹</button>
+      <span class="slide-counter">
+        <span id="currentSlide">1</span> / <span id="totalSlides">21</span>
+      </span>
+      <button class="nav-btn" id="nextBtn" onclick="changeSlide(1)">›</button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+
+    <script>
+      let currentSlideIndex = 0;
+      const slides = document.querySelectorAll(".slide");
+      const totalSlides = slides.length;
+      const progressBar = document.getElementById("progressBar");
+
+      document.getElementById("totalSlides").textContent = totalSlides;
+
+      function updateSlide() {
+        slides.forEach((slide, index) => {
+          slide.classList.toggle("active", index === currentSlideIndex);
+        });
+
+        document.getElementById("currentSlide").textContent =
+          currentSlideIndex + 1;
+
+        const progress = ((currentSlideIndex + 1) / totalSlides) * 100;
+        progressBar.style.width = progress + "%";
+
+        document.getElementById("prevBtn").disabled = currentSlideIndex === 0;
+        document.getElementById("nextBtn").disabled =
+          currentSlideIndex === totalSlides - 1;
+      }
+
+      function changeSlide(direction) {
+        const newIndex = currentSlideIndex + direction;
+        if (newIndex >= 0 && newIndex < totalSlides) {
+          currentSlideIndex = newIndex;
+          updateSlide();
+        }
+      }
+
+      function goToSlide(slideIndex) {
+        if (slideIndex >= 0 && slideIndex < totalSlides) {
+          currentSlideIndex = slideIndex;
+          updateSlide();
+        }
+      }
+
+      // Keyboard navigation
+      document.addEventListener("keydown", (e) => {
+        switch (e.key) {
+          case "ArrowRight":
+          case " ":
+            e.preventDefault();
+            changeSlide(1);
+            break;
+          case "ArrowLeft":
+            e.preventDefault();
+            changeSlide(-1);
+            break;
+          case "Home":
+            e.preventDefault();
+            currentSlideIndex = 0;
+            updateSlide();
+            break;
+          case "End":
+            e.preventDefault();
+            currentSlideIndex = totalSlides - 1;
+            updateSlide();
+            break;
+        }
+      });
+
+      // Touch/Mouse navigation
+      let startX = 0;
+      let endX = 0;
+
+      document.addEventListener("touchstart", (e) => {
+        startX = e.touches[0].clientX;
+      });
+
+      document.addEventListener("touchend", (e) => {
+        endX = e.changedTouches[0].clientX;
+        handleSwipe();
+      });
+
+      document.addEventListener("mousedown", (e) => {
+        startX = e.clientX;
+      });
+
+      document.addEventListener("mouseup", (e) => {
+        endX = e.clientX;
+        if (Math.abs(endX - startX) > 50) {
+          handleSwipe();
+        }
+      });
+
+      function handleSwipe() {
+        const deltaX = endX - startX;
+        if (Math.abs(deltaX) > 50) {
+          if (deltaX > 0) {
+            changeSlide(-1); // Swipe right - previous slide
+          } else {
+            changeSlide(1); // Swipe left - next slide
+          }
+        }
+      }
+
+      // Initialize
+      updateSlide();
+
+      // Image Modal Logic
+      const modal = document.getElementById("imageModal");
+      if (modal) {
+        const modalImg = document.getElementById("modalImage");
+        const expandableImages = document.querySelectorAll(".expandable");
+        const closeModal = document.querySelector(".close-modal");
+
+        expandableImages.forEach((img) => {
+          img.onclick = function () {
+            modal.classList.add("show");
+            modalImg.src = this.src;
+          };
+        });
+
+        const close = () => {
+          modal.classList.remove("show");
+        };
+
+        closeModal.onclick = close;
+        modal.onclick = function (e) {
+          if (e.target === modal) {
+            close();
+          }
+        };
+      }
+    </script>
+  </body>
+</html>
